@@ -1,2 +1,2 @@
-# coltr-ai-ne
+# ColtrAIne
 A jazz soloist AI
