@@ -13,10 +13,13 @@ import matplotlib.pyplot as plt
 import pretty_midi
 import os
 import numpy
+
+BITE_SIZE = 128 # When modifying bite size, keep time resolution in mind
+TIME_RESOLUTION = 32
 # Load the MIDI file
 def midi_to_tensor(midi_file):
     notes = midi_file.instruments[0].notes # Grab notes only
-    time_resolution = 32  # Quantize
+    time_resolution = TIME_RESOLUTION  # Quantize
 
     # Create tensor for MIDI: shape of (num_time_steps, num_pitches)
     num_time_steps = int(midi_file.get_end_time() * time_resolution) + 1
@@ -74,3 +77,4 @@ plt.ylabel('Pitch (MIDI Note Number)')
 # Show the plot
 plt.show()
 
+# ------ END OF DATA PIPELINE CODE --------
