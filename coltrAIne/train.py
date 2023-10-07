@@ -16,6 +16,11 @@ import numpy
 
 BITE_SIZE = 1024 # When modifying bite size, keep time resolution in mind
 TIME_RESOLUTION = 32
+NUM_PITCHES = 128
+
+# ----- End of Imports -----
+# ----- START OF DATA PIPELINE -----
+# Define dataset loading and preprocessing code
 
 # Load the MIDI file
 def midi_to_tensor(midi_file):
@@ -24,7 +29,7 @@ def midi_to_tensor(midi_file):
 
     # Create tensor for MIDI: shape of (num_time_steps, num_pitches)
     num_time_steps = int(midi_file.get_end_time() * time_resolution) + 1
-    num_pitches = 128  # Assuming MIDI standard pitch range
+    num_pitches = NUM_PITCHES  # Assuming MIDI standard pitch range
     midi_tensor = torch.zeros(num_time_steps, num_pitches)
 
     # Go through all notes
@@ -105,4 +110,23 @@ plt.title('')
 # Show the plot
 plt.show()
 
-# ------ END OF DATA PIPELINE CODE --------
+# ----- End of Data Pipeline -----
+# ----- NETWORK ARCHITECTURE -----
+# Define the LSTM SoloistModel architecture
+class Soloist(nn.Module):
+
+    def __init__(self, in_size, hid_size, layers, out_size):
+        super(Soloist, self).__init__()
+        self.lstm = nn.LSTM(input_size=in_size, hidden_size=hid_size, num_layers=layers, batch_first=True)
+        self.in_size = in_size
+        self.hid_size = hid_size
+        self.layers = layers
+        self.out_size = out_size
+        self.dropout = nn.Dropout(0.2)
+        # self.linear = nn.Linear(256, n_vocab)
+
+    def forward(self, x):
+        x, _ = self.lstm(x)
+        x = x[:, -1, :]
+        x = self.linear(self.dropout(x))
+        return x
