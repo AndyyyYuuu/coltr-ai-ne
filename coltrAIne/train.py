@@ -17,6 +17,7 @@ import numpy
 BITE_SIZE = 1024 # When modifying bite size, keep time resolution in mind
 TIME_RESOLUTION = 32
 NUM_PITCHES = 128
+HIDDEN_SIZE = 512
 
 # ----- End of Imports -----
 # ----- START OF DATA PIPELINE -----
@@ -113,8 +114,11 @@ plt.show()
 # ----- End of Data Pipeline -----
 # ----- NETWORK ARCHITECTURE -----
 # Define the LSTM SoloistModel architecture
+
 class Soloist(nn.Module):
 
+    '''
+    # The simpler method
     def __init__(self, in_size, hid_size, layers, out_size):
         super(Soloist, self).__init__()
         self.lstm = nn.LSTM(input_size=in_size, hidden_size=hid_size, num_layers=layers, batch_first=True)
@@ -130,3 +134,42 @@ class Soloist(nn.Module):
         x = x[:, -1, :]
         x = self.linear(self.dropout(x))
         return x
+    '''
+
+    def __init__(self, input_size, hidden_size, classes_num, layers=2):
+        super(Soloist, self).__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.classes = classes_num
+        self.layers = layers
+        self.sequence_enc = nn.Linear(in_features=input_size, out_features=hidden_size)
+        self.batch_norm_layer = nn.BatchNorm1d(hidden_size)
+        self.lstm_layer = nn.LSTM(hidden_size, hidden_size, layers)
+        self.fc_layer = nn.Linear(hidden_size, classes_num)
+
+    def forward(self, ip_seqs, ip_seqs_len, hidden_state=None):
+
+        seq_enc = self.seqence_enc(ip_seqs) # Encode input sequence
+        seq_enc_rol = seq_enc.permute(1, 2, 0).contiguous()  # Permute
+        seq_enc_norm = self.bn_layer(seq_enc_rol)  # Normalize
+        seq_enc_norm_dropout = nn.Dropout(0.25)(seq_enc_norm)  # Apply dropout for regularization
+        seq_enc_revert = seq_enc_norm_dropout.permute(2, 0, 1)  # Revert sequence order
+
+        seq_packed = torch.nn.utils.rnn.pack_padded_sequence(seq_enc_revert, ip_seqs_len)  # pack sequences for lstm
+        lstm_output, hidden_state = self.lstm_layer(seq_packed, hidden_state)  # pass sequences through lstm layer
+
+        output_unpacked, _ = torch.nn.utils.rnn.pad_packed_sequence(lstm_output)  # unpack sequences
+
+        output_norm = self.batch_norm_layer(lstm_output.permute(1, 2, 0).contiguous())  # normalize
+        output_norm_dropout = nn.Dropout(0.1)(output_norm)  # apply dropout layer
+        logits = self.fc_layer(output_norm_dropout.permute(2, 0, 1))  # pass through fully connected layer --> logits
+        logits = logits.transpose(0, 1).contiguous()
+
+        zero_one_logits = torch.stack((logits, 1 - logits), dim=3).contiguous()  # stack logits and reverse logits
+        flattened_logits = zero_one_logits.view(-1, 2)  # flatten logits
+        return flattened_logits, hidden_state
+
+
+# The soloist is born
+soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
+
