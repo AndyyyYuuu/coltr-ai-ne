@@ -40,6 +40,18 @@ def midi_to_tensor(midi_file):
     midi_tensor = torch.Tensor(midi_tensor)
     return midi_tensor
 
+
+def pad_tensor(tensor, target_size):
+    current_size = tensor.shape[0]
+    if current_size == target_size:
+        return tensor
+    elif current_size > target_size:
+        raise ValueError(f"Input tensor exceeds target size {target_size}")
+    zeros_num = target_size - current_size
+    zeros = torch.zeros((zeros_num,) + tensor.shape[1:], dtype=tensor.dtype, device=tensor.device)
+    return torch.cat((tensor, zeros), dim=0)
+
+
 class JazzDataset(Dataset):
     def __init__(self, data_dir, chunk_size):
         print("Initializing dataset...")
@@ -48,7 +60,7 @@ class JazzDataset(Dataset):
         self.data = []
         for i in sorted(os.listdir(data_dir)):
             midi_tensor = midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i)))
-            self.data.extend(torch.split(midi_tensor, self.chunk_size))
+            self.data.extend([pad_tensor(t, BITE_SIZE) for t in torch.split(midi_tensor, self.chunk_size)])
         print("Dataset complete!")
         '''
         for i in sorted(os.listdir(data_dir)):
