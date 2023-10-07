@@ -14,8 +14,9 @@ import pretty_midi
 import os
 import numpy
 
-BITE_SIZE = 128 # When modifying bite size, keep time resolution in mind
+BITE_SIZE = 1024 # When modifying bite size, keep time resolution in mind
 TIME_RESOLUTION = 32
+
 # Load the MIDI file
 def midi_to_tensor(midi_file):
     notes = midi_file.instruments[0].notes # Grab notes only
@@ -40,21 +41,34 @@ def midi_to_tensor(midi_file):
     return midi_tensor
 
 class JazzDataset(Dataset):
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, chunk_size):
+        print("Initializing dataset...")
         self.data_dir = data_dir
-        self.data = os.listdir(data_dir)
+        self.chunk_size = chunk_size
+        self.data = []
+        for i in sorted(os.listdir(data_dir)):
+            midi_tensor = midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i)))
+            self.data.extend(torch.split(midi_tensor, self.chunk_size))
+        print("Dataset complete!")
+        '''
+        for i in sorted(os.listdir(data_dir)):
+            self.data.append(torch.split(midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i))), self.chunk_size))
+        '''
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, i):
+        '''
         path = os.path.join(self.data_dir, self.data[i])
         midi_file = pretty_midi.PrettyMIDI(path)
         print(path)
-        return midi_to_tensor(midi_file)
+        '''
+        return self.data[i]
+        #return midi_to_tensor(self.data[i])
 
-dataset = JazzDataset(data_dir="weimar_jazz_database")
-print(dataset.__getitem__(2))
+dataset = JazzDataset(data_dir="weimar_jazz_database", chunk_size=BITE_SIZE)
+#print(torch.split(item, BITE_SIZE))
 
 train_size = int(0.8 * len(dataset))  # 80% for training
 test_size = len(dataset) - train_size  # 20% for testing
@@ -65,14 +79,16 @@ batch_size = 32
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-subset_tensor = dataset.__getitem__(0)#[:1000, :]  # Visualize the first 1000 time steps as an example
+subset_tensor = dataset.__getitem__(-1)#[:1000, :]
+print(subset_tensor.shape)
 
 # Create a binary image-like visualization
 plt.imshow(numpy.flipud(subset_tensor.T), cmap='gray', aspect='auto')
 
 # Add labels to the axes
 plt.xlabel('Time Step')
-plt.ylabel('Pitch (MIDI Note Number)')
+plt.ylabel('MIDI note #')
+plt.title('')
 
 # Show the plot
 plt.show()
