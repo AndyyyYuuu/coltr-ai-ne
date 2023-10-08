@@ -170,6 +170,7 @@ class Soloist(nn.Module):
         return flattened_logits, hidden_state
 
 
+loss_function = nn.CrossEntropyLoss().cpu()
 # The soloist is born
 soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
 
