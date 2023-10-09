@@ -78,6 +78,8 @@ def pos_proc_seq(batch):
     batch_split_lens = lens.split(split_size=1)
     tr_data_tups = zip(ip_seq_split_batch, op_seq_split_batch, batch_split_lens)
     ord_tr_data_tups = sorted(tr_data_tups, key=lambda c: int(c[2]), reverse=True)
+    # ord_tr_data_tups = sorted(tr_data_tups, key=lambda c: c[2].shape[1], reverse=True)
+    # ord_tr_data_tups = tr_data_tups
     ip_seq_split_batch, op_seq_split_batch, batch_split_lens = zip(*ord_tr_data_tups)
     ord_ip_seq_batch = torch.cat(ip_seq_split_batch)
     ord_op_seq_batch = torch.cat(op_seq_split_batch)
@@ -124,8 +126,8 @@ test_size = len(dataset) - train_size  # 20% for testing
 
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 # Create data loaders for training and testing
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True, drop_last=True)
+test_loader = DataLoader(test_dataset, batch_size=3, shuffle=False, drop_last=False)
 
 subset_tensor = dataset.__getitem__(-1)#[:1000, :]
 print(subset_tensor.shape)
