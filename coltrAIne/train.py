@@ -126,7 +126,7 @@ test_size = len(dataset) - train_size  # 20% for testing
 
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
 # Create data loaders for training and testing
-train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True, drop_last=True)
+train_loader = DataLoader(train_dataset, batch_size=3, shuffle=True, drop_last=True)
 test_loader = DataLoader(test_dataset, batch_size=3, shuffle=False, drop_last=False)
 
 subset_tensor = dataset.__getitem__(-1)#[:1000, :]
@@ -170,13 +170,14 @@ class Soloist(nn.Module):
         self.fc_layer = nn.Linear(hidden_size, classes_num)
 
     def forward(self, ip_seqs, ip_seqs_len, hidden_state=None):
-
-        seq_enc = self.seqence_enc(ip_seqs) # Encode input sequence
+        ip_seqs = ip_seqs.unsqueeze(2)  # Shape will become [1024, 128, 1]
+        seq_enc = self.sequence_enc(ip_seqs) # Encode input sequence
         seq_enc_rol = seq_enc.permute(1, 2, 0).contiguous()  # Permute
+        #seq_enc_rol = seq_enc.transpose(0, 2).contiguous()
         seq_enc_norm = self.bn_layer(seq_enc_rol)  # Normalize
         seq_enc_norm_dropout = nn.Dropout(0.25)(seq_enc_norm)  # Apply dropout for regularization
         seq_enc_revert = seq_enc_norm_dropout.permute(2, 0, 1)  # Revert sequence order
-
+        #seq_enc_revert = seq_enc_norm_dropout.transpose(0, 2).contagious()
         seq_packed = torch.nn.utils.rnn.pack_padded_sequence(seq_enc_revert, ip_seqs_len)  # pack sequences for lstm
         lstm_output, hidden_state = self.lstm_layer(seq_packed, hidden_state)  # pass sequences through lstm layer
 
@@ -203,6 +204,7 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
         lstm_model.train()
         loss_ep = []
         for batch in train_loader:
+            '''
             print(batch)
             post_proc_b = pos_proc_seq(batch)
             ip_seq_b, op_seq_b, seq_l = post_proc_b
@@ -216,6 +218,19 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(lstm_model.parameters(), grad_clip)
             opt.step()
+            '''
+            ip_seq_b, op_seq_b, seq_l = batch
+            ip_seq_b_v = Variable(ip_seq_b.transpose(0, 1).contiguous().view(-1, 128).cpu())
+            op_seq_b_v = Variable(op_seq_b.transpose(0, 1).contiguous().view(-1, 128).cpu())
+            opt.zero_grad()
+            logits, _ = lstm_model(ip_seq_b_v, seq_l)
+            loss = loss_function(logits, op_seq_b_v)
+            list_of_losses.append(loss.item())
+            loss_ep.append(loss.item())
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(lstm_model.parameters(), grad_clip)
+            opt.step()
+
 
         tr_ep_cur = sum(loss_ep)/len(train_loader)
         print(f'ep {curr_ep} , train loss = {tr_ep_cur}')
