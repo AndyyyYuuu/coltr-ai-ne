@@ -57,6 +57,23 @@ def pad_tensor(tensor, target_size):
     zeros = torch.zeros((zeros_num,) + tensor.shape[1:], dtype=tensor.dtype, device=tensor.device)
     return torch.cat((tensor, zeros), dim=0)
 
+def pos_proc_seq(batch):
+    ip_seqs, op_seqs, lens = batch
+    ip_seq_split_batch = ip_seqs.split(split_size=1)
+    op_seq_split_batch = op_seqs.split(split_size=1)
+    batch_split_lens = lens.split(split_size=1)
+    tr_data_tups = zip(ip_seq_split_batch, op_seq_split_batch, batch_split_lens)
+    ord_tr_data_tups = sorted(tr_data_tups, key=lambda c: int(c[2]), reverse=True)
+    ip_seq_split_batch, op_seq_split_batch, batch_split_lens = zip(*ord_tr_data_tups)
+    ord_ip_seq_batch = torch.cat(ip_seq_split_batch)
+    ord_op_seq_batch = torch.cat(op_seq_split_batch)
+    ord_batch_lens = torch.cat(batch_split_lens)
+    ord_ip_seq_batch = ord_ip_seq_batch[:, -ord_batch_lens[0, 0]:, :]
+    ord_op_seq_batch = ord_op_seq_batch[:, -ord_batch_lens[0, 0]:, :]
+    tps_ip_seq_batch = ord_ip_seq_batch.transpose(0, 1)
+    ord_batch_lens_l = list(ord_batch_lens)
+    ord_batch_lens_l = map(lambda k: int(k), ord_batch_lens_l)
+    return tps_ip_seq_batch, ord_op_seq_batch, list(ord_batch_lens_l)
 
 class JazzDataset(Dataset):
     def __init__(self, data_dir, chunk_size):
