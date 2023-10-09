@@ -110,16 +110,10 @@ class JazzDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, i):
-        '''
-        path = os.path.join(self.data_dir, self.data[i])
-        midi_file = pretty_midi.PrettyMIDI(path)
-        print(path)
-        '''
         return self.data[i]
-        #return midi_to_tensor(self.data[i])
 
 dataset = JazzDataset(data_dir="weimar_jazz_database", chunk_size=BITE_SIZE)
-#print(torch.split(item, BITE_SIZE))
+
 
 train_size = int(0.8 * len(dataset))  # 80% for training
 test_size = len(dataset) - train_size  # 20% for testing
@@ -247,7 +241,7 @@ def evaluate_model(lstm_model):
         vl_loss_full += loss.item()
         seq_len += sum(seq_l)
 
-    return vl_loss_full / (seq_len * 88)
+    return vl_loss_full / (seq_len * NUM_PITCHES)
 
 loss_function = nn.CrossEntropyLoss().cpu()
 
