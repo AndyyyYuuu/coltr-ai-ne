@@ -15,6 +15,7 @@ import os
 import numpy
 
 BITE_SIZE = 1024 # When modifying bite size, keep time resolution in mind
+BATCH_SIZE = 5
 TIME_RESOLUTION = 32
 NUM_PITCHES = 128
 HIDDEN_SIZE = 512
@@ -22,6 +23,19 @@ HIDDEN_SIZE = 512
 # ----- End of Imports -----
 # ----- START OF DATA PIPELINE -----
 # Define dataset loading and preprocessing code
+
+
+def display_midi_tensor(tensor):
+    # Create a binary image-like visualization
+    plt.imshow(numpy.flipud(tensor.T), cmap='gray', aspect='auto')
+
+    # Add labels to the axes
+    plt.xlabel('Time Step')
+    plt.ylabel('MIDI note #')
+    plt.title('')
+
+    # Show the plot
+    plt.show()
 
 # Load the MIDI file
 def midi_to_tensor(midi_file):
@@ -109,24 +123,13 @@ train_size = int(0.8 * len(dataset))  # 80% for training
 test_size = len(dataset) - train_size  # 20% for testing
 
 train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-batch_size = 32
 # Create data loaders for training and testing
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 subset_tensor = dataset.__getitem__(-1)#[:1000, :]
 print(subset_tensor.shape)
 
-# Create a binary image-like visualization
-# plt.imshow(numpy.flipud(subset_tensor.T), cmap='gray', aspect='auto')
-
-# Add labels to the axes
-plt.xlabel('Time Step')
-plt.ylabel('MIDI note #')
-plt.title('')
-
-# Show the plot
-plt.show()
 
 # ----- End of Data Pipeline -----
 # ----- NETWORK ARCHITECTURE -----
@@ -198,6 +201,7 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
         lstm_model.train()
         loss_ep = []
         for batch in train_loader:
+            print(batch)
             post_proc_b = pos_proc_seq(batch)
             ip_seq_b, op_seq_b, seq_l = post_proc_b
             op_seq_b_v = Variable(op_seq_b.contiguous().view(-1).cpu())
@@ -244,6 +248,9 @@ def evaluate_model(lstm_model):
     return vl_loss_full / (seq_len * 88)
 
 loss_function = nn.CrossEntropyLoss().cpu()
+
 # The soloist is born
 soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
+
+val_loss_best, lstm_model = train_model(soloist, lr=0.01, ep=10)
 
