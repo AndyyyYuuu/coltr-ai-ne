@@ -187,6 +187,46 @@ class Soloist(nn.Module):
         return flattened_logits, hidden_state
 
 
+
+def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
+    list_of_losses = []
+    list_of_val_losses = []
+    model_params = lstm_model.parameters()
+    opt = torch.optim.Adam(model_params, lr=lr)
+    grad_clip = 1.0
+    for curr_ep in range(ep):
+        lstm_model.train()
+        loss_ep = []
+        for batch in train_loader:
+            post_proc_b = pos_proc_seq(batch)
+            ip_seq_b, op_seq_b, seq_l = post_proc_b
+            op_seq_b_v = Variable(op_seq_b.contiguous().view(-1).cpu())
+            ip_seq_b_v = Variable(ip_seq_b.cpu())
+            opt.zero_grad()
+            logits, _ = lstm_model(ip_seq_b_v, seq_l)
+            loss = loss_function(logits, op_seq_b_v)
+            list_of_losses.append(loss.item())
+            loss_ep.append(loss.item())
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(lstm_model.parameters(), grad_clip)
+            opt.step()
+
+        tr_ep_cur = sum(loss_ep)/len(train_loader)
+        print(f'ep {curr_ep} , train loss = {tr_ep_cur}')
+
+        vl_ep_cur = evaluate_model(lstm_model)
+        print(f'ep {curr_ep} , val loss = {vl_ep_cur}\n')
+
+        list_of_val_losses.append(vl_ep_cur)
+
+        if vl_ep_cur < val_loss_best:
+            torch.save(lstm_model.state_dict(), 'models/soloist_1.pth')
+            val_loss_best = vl_ep_cur
+    return val_loss_best, lstm_model
+
+
+def evaluate_model(lstm_model):
+    pass
 loss_function = nn.CrossEntropyLoss().cpu()
 # The soloist is born
 soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
