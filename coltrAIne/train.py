@@ -118,7 +118,7 @@ subset_tensor = dataset.__getitem__(-1)#[:1000, :]
 print(subset_tensor.shape)
 
 # Create a binary image-like visualization
-plt.imshow(numpy.flipud(subset_tensor.T), cmap='gray', aspect='auto')
+# plt.imshow(numpy.flipud(subset_tensor.T), cmap='gray', aspect='auto')
 
 # Add labels to the axes
 plt.xlabel('Time Step')
@@ -226,7 +226,23 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
 
 
 def evaluate_model(lstm_model):
-    pass
+
+    lstm_model.eval()
+    vl_loss_full = 0.0
+    seq_len = 0.0
+
+    for batch in test_loader:
+        post_proc_b = pos_proc_seq(batch)
+        ip_seq_b, op_seq_b, seq_l = post_proc_b
+        op_seq_b_v = Variable(op_seq_b.contiguous().view(-1).cpu())
+        ip_seq_b_v = Variable(ip_seq_b.cpu())
+        logits, _ = lstm_model(ip_seq_b_v, seq_l)
+        loss = loss_function(logits, op_seq_b_v)
+        vl_loss_full += loss.item()
+        seq_len += sum(seq_l)
+
+    return vl_loss_full / (seq_len * 88)
+
 loss_function = nn.CrossEntropyLoss().cpu()
 # The soloist is born
 soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
