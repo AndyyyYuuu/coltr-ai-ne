@@ -71,6 +71,65 @@ def pad_tensor(tensor, target_size):
     zeros = torch.zeros((zeros_num,) + tensor.shape[1:], dtype=tensor.dtype, device=tensor.device)
     return torch.cat((tensor, zeros), dim=0)
 
+
+class JazzDataset(Dataset):
+    def __init__(self, data_dir, chunk_size):
+        print("Initializing dataset...")
+        self.data_dir = data_dir
+        self.chunk_size = chunk_size
+        self.data = []
+        for i in sorted(os.listdir(data_dir)):
+            midi_tensor = midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i)))
+            #self.data.append(midi_tensor)
+            self.data.extend([pad_tensor(t, BITE_SIZE) for t in torch.split(midi_tensor, self.chunk_size)])
+
+        print("Dataset complete!")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, i):
+        return self.data[i]
+
+
+# Custom data formatting
+def format_dataset(batch):
+    # Sort the batch by sequence length in descending order
+    batch = sorted(batch, key=lambda x: x.shape[1], reverse=True)
+
+    # Extract sequences and lengths
+    sequences = [sequence for sequence in batch]
+    lengths = sorted([sequence.shape[1] for sequence in batch], reverse=True)
+
+    # Create input and output sequences
+    max_length = max(lengths)
+    input_sequences = torch.cat([sequence for sequence in sequences], dim=1)
+    output_sequences = torch.cat([sequence for sequence in sequences], dim=1)
+
+    return input_sequences, output_sequences, lengths
+
+dataset = JazzDataset(data_dir="weimar_jazz_database", chunk_size=BITE_SIZE)
+
+
+train_size = int(0.8 * len(dataset))  # 80% for training
+test_size = len(dataset) - train_size  # 20% for testing
+
+train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+# Create data loaders for training and testing
+train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True, drop_last=True, collate_fn=format_dataset)
+test_loader = DataLoader(test_dataset, batch_size=3, shuffle=False, drop_last=False, collate_fn=format_dataset)
+
+subset_tensor = dataset.__getitem__(-1)#[:1000, :]
+print(subset_tensor.shape)
+
+
+# ----- End of Data Pipeline -----
+# ----- NETWORK ARCHITECTURE -----
+# Define the LSTM SoloistModel architecture
+def pos_proc_seq(batch):
+    ip_seqs, op_seqs, lens = batch
+    return ip_seqs, op_seqs, lens
+'''
 def pos_proc_seq(batch):
     ip_seqs, op_seqs, lens = batch
     ip_seq_split_batch = ip_seqs.split(split_size=1)
@@ -78,8 +137,6 @@ def pos_proc_seq(batch):
     batch_split_lens = lens.split(split_size=1)
     tr_data_tups = zip(ip_seq_split_batch, op_seq_split_batch, batch_split_lens)
     ord_tr_data_tups = sorted(tr_data_tups, key=lambda c: int(c[2]), reverse=True)
-    # ord_tr_data_tups = sorted(tr_data_tups, key=lambda c: c[2].shape[1], reverse=True)
-    # ord_tr_data_tups = tr_data_tups
     ip_seq_split_batch, op_seq_split_batch, batch_split_lens = zip(*ord_tr_data_tups)
     ord_ip_seq_batch = torch.cat(ip_seq_split_batch)
     ord_op_seq_batch = torch.cat(op_seq_split_batch)
@@ -90,46 +147,7 @@ def pos_proc_seq(batch):
     ord_batch_lens_l = list(ord_batch_lens)
     ord_batch_lens_l = map(lambda k: int(k), ord_batch_lens_l)
     return tps_ip_seq_batch, ord_op_seq_batch, list(ord_batch_lens_l)
-
-class JazzDataset(Dataset):
-    def __init__(self, data_dir, chunk_size):
-        print("Initializing dataset...")
-        self.data_dir = data_dir
-        self.chunk_size = chunk_size
-        self.data = []
-        for i in sorted(os.listdir(data_dir)):
-            midi_tensor = midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i)))
-            self.data.extend([pad_tensor(t, BITE_SIZE) for t in torch.split(midi_tensor, self.chunk_size)])
-        print("Dataset complete!")
-        '''
-        for i in sorted(os.listdir(data_dir)):
-            self.data.append(torch.split(midi_to_tensor(pretty_midi.PrettyMIDI(os.path.join(self.data_dir, i))), self.chunk_size))
-        '''
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, i):
-        return self.data[i]
-
-dataset = JazzDataset(data_dir="weimar_jazz_database", chunk_size=BITE_SIZE)
-
-
-train_size = int(0.8 * len(dataset))  # 80% for training
-test_size = len(dataset) - train_size  # 20% for testing
-
-train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
-# Create data loaders for training and testing
-train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True, drop_last=True)
-test_loader = DataLoader(test_dataset, batch_size=3, shuffle=False, drop_last=False)
-
-subset_tensor = dataset.__getitem__(-1)#[:1000, :]
-print(subset_tensor.shape)
-
-
-# ----- End of Data Pipeline -----
-# ----- NETWORK ARCHITECTURE -----
-# Define the LSTM SoloistModel architecture
+'''
 
 class Soloist(nn.Module):
 
@@ -165,7 +183,7 @@ class Soloist(nn.Module):
 
     def forward(self, ip_seqs, ip_seqs_len, hidden_state=None):
 
-        seq_enc = self.seqence_enc(ip_seqs) # Encode input sequence
+        seq_enc = self.sequence_enc(ip_seqs) # Encode input sequence
         seq_enc_rol = seq_enc.permute(1, 2, 0).contiguous()  # Permute
         seq_enc_norm = self.bn_layer(seq_enc_rol)  # Normalize
         seq_enc_norm_dropout = nn.Dropout(0.25)(seq_enc_norm)  # Apply dropout for regularization
