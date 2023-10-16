@@ -71,6 +71,8 @@ def pad_tensor(tensor, target_size):
     zeros = torch.zeros((zeros_num,) + tensor.shape[1:], dtype=tensor.dtype, device=tensor.device)
     return torch.cat((tensor, zeros), dim=0)
 
+
+# The most problematic function I've ever had to deal with >:(
 def pos_proc_seq(batch):
     ip_seqs, op_seqs, lens = batch
     ip_seq_split_batch = ip_seqs.split(split_size=1)
@@ -204,7 +206,7 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
         lstm_model.train()
         loss_ep = []
         for batch in train_loader:
-            '''
+
             print(batch)
             post_proc_b = pos_proc_seq(batch)
             ip_seq_b, op_seq_b, seq_l = post_proc_b
@@ -230,6 +232,7 @@ def train_model(lstm_model, lr, ep=10, val_loss_best=float("inf")):
             loss.backward()
             torch.nn.utils.clip_grad_norm_(lstm_model.parameters(), grad_clip)
             opt.step()
+            '''
 
 
         tr_ep_cur = sum(loss_ep)/len(train_loader)
