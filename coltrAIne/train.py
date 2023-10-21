@@ -125,7 +125,8 @@ print(subset_tensor.shape)
 
 # ----- End of Data Pipeline -----
 # ----- NETWORK ARCHITECTURE -----
-# Define the LSTM SoloistModel architecture
+
+#
 def pos_proc_seq(batch):
     ip_seqs, op_seqs, lens = batch
     return ip_seqs, op_seqs, lens
@@ -149,6 +150,7 @@ def pos_proc_seq(batch):
     return tps_ip_seq_batch, ord_op_seq_batch, list(ord_batch_lens_l)
 '''
 
+# Define the LSTM SoloistModel architecture
 class Soloist(nn.Module):
 
     '''
@@ -264,7 +266,7 @@ def evaluate_model(lstm_model):
 loss_function = nn.CrossEntropyLoss().cpu()
 
 # The soloist is born
-soloist = Soloist(input_size=NUM_PITCHES, hidden_size=HIDDEN_SIZE, classes_num=NUM_PITCHES).cpu()
+soloist = Soloist(input_size=640, hidden_size=1024, classes_num=NUM_PITCHES).cpu()
 
 val_loss_best, lstm_model = train_model(soloist, lr=0.01, ep=10)
 
